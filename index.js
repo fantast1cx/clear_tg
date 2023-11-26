@@ -64,7 +64,9 @@ bot.on('successful_payment', (ctx, next) => {
 
     const AppsScriptURL = 'https://script.google.com/macros/s/AKfycbyTTAbrds_iIrm03BUfaf7fF9wAccrHet3qg5TnXoUYNfZAZCrflYzb4hg5wJouJ6Su5w/exec';
 
-    axios.post(AppsScriptURL, JSON.stringify(ctx.update.message.successful_payment.invoice_payload), { headers: { 'Content-Type': 'application/json' } });
+    axios.post(AppsScriptURL, JSON.stringify(ctx.update.message.successful_payment.invoice_payload), { headers: { 'Content-Type': 'application/json' } })
+    .then(response => console.log('AppsScript -->', response))
+    .catch(err => console.log(err));
 
     ctx.reply('Оплата прошла успешно');
 
