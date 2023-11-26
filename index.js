@@ -59,8 +59,15 @@ bot.use(Telegraf.log());
 bot.on('pre_checkout_query', (ctx) => ctx.answerPreCheckoutQuery(true));
 
 bot.on('successful_payment', (ctx, next) => {
+
     console.log(ctx.update.message.successful_payment);
+
+    const AppsScriptURL = 'https://script.google.com/macros/s/AKfycbyTTAbrds_iIrm03BUfaf7fF9wAccrHet3qg5TnXoUYNfZAZCrflYzb4hg5wJouJ6Su5w/exec';
+
+    axios.post(AppsScriptURL, JSON.stringify(ctx.update.message.successful_payment.invoice_payload), { headers: { 'Content-Type': 'application/json' } });
+
     ctx.reply('Оплата прошла успешно');
+
 });
 
 bot.launch();
