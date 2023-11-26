@@ -1,37 +1,19 @@
-// ***** TG BOT *****
+const axios = require('axios');
 
-const telegram_api = require('node-telegram-bot-api');
-const token = '6329876475:AAF-tHAts_Hbw2StXJ-hQ18t4R_eP6D9T1A';
-const bot = new telegram_api(token, {polling: true});
-
-// ***** TG BOT *****
-
-
-
-// ***** GOOGLE SHEETS *****
-
-const { google } = require("googleapis");
-
-const credentials = "./google_credit.json";
-const SPREADSHEET_ID = "1-gvZ_W9PhSgmIT-qlaDQlzi_fOZC1F6694Qa9Ri9FVU";
-
-const auth = new google.auth.GoogleAuth({
-  keyFile: credentials,
-  scopes: "https://www.googleapis.com/auth/spreadsheets",
-
-
-});
-
-// ***** GOOGLE SHEETS *****
-
-
+const { Telegraf, Markup, Telegram } = require('telegraf');
+require('dotenv').config();
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
 const express = require("express");
+const bodyParser = require('body-parser');
 const app = express();
 const port = process.env.PORT || 3000;
 const cors = require("cors");
 app.use(cors());
 app.use(express.static(__dirname));
+app.use(bodyParser.json());
+
+
 
 
 app.get('/', (req, res) => {
@@ -40,117 +22,54 @@ app.get('/', (req, res) => {
 
 });
 
-app.get('/google', async (req, res) => {
+app.post('/get_invoice', async (req, res) => {
 
-    const data = await get_data();
+    let data = req.body;
+    let tg_api_url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/createInvoiceLink`;
 
-    res.json(data);
+    const invoice = {
+        chat_id: data.chat_id,
+        provider_token: process.env.STRIPE_TOKEN,
+        start_parameter: 'get_access',
+        title: data.name,
+        description: data.desc,
+        currency: 'RUB',
+        prices: [{ label: data.name, amount: 100 * data.price }], 
+        payload: {
+          unique_id: `${data.user_name}_${Number(new Date())}_${data.id}`,
+          provider_token: process.env.STRIPE_TOKEN 
+        }
+    };
+
+    axios.post(tg_api_url, JSON.stringify(invoice), { headers: { 'Content-Type': 'application/json' } })
+    .then(response => res.send(response.data.result))
+    .catch(err => console.error(err));
 
 });
-
 
 app.listen(port, () => console.log(`server started on ${port} port`));
 
 
-async function get_data() {
-
-    const client = await auth.getClient();
-    const sheets = google.sheets({ version: 'v4', auth: client });
-
-    const getRows = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: 'Sheet!A:D'
-    });
-
-    return getRows.data.values;
-
-}
-
-async function set_data() {
-
-    const client = await auth.getClient();
-    const sheets = google.sheets({ version: 'v4', auth: client });
-
-    await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: 'Orders!A:B',
-        valueInputOption: 'USER_ENTERED',
-        resource: {
-            values: [
-                [1, 'test_1'],
-                [2, 'test_2']
-            ]
-        }
-    });
-
-}
 
 
+bot.start(ctx => ctx.reply('Привет, все товары можешь посмотреть нажав на кнопку "Меню"'));
 
+bot.use(Telegraf.log());
 
+bot.on('pre_checkout_query', (ctx) => ctx.answerPreCheckoutQuery(true));
 
+bot.on('successful_payment', (ctx, next) => {
 
+    console.log(ctx.update.message.successful_payment);
 
+    const AppsScriptURL = 'https://script.google.com/macros/s/AKfycbyTTAbrds_iIrm03BUfaf7fF9wAccrHet3qg5TnXoUYNfZAZCrflYzb4hg5wJouJ6Su5w/exec';
 
+    axios.post(AppsScriptURL, ctx.update.message.successful_payment.invoice_payload, { headers: { 'Content-Type': 'application/json' } })
+    .then(response => console.log('AppsScript -->', response))
+    .catch(err => console.error(err));
 
+    ctx.reply('Оплата прошла успешно');
 
+});
 
-
-
-
-
-
-
-
-
-
-
-
-// buttons.js -> module.exports -> objects
-// const {btn_0, btn_1} = require('./buttons');
-
-// // добовляет вкладку "Меню" в которой перечисленны команды
-// bot.setMyCommands([
-//     {command: '/start', description: 'start function'},
-//     {command: '/test', description: 'start function'}
-// ]);
-
-// const buttons = {
-//     reply_markup: JSON.stringify({
-//         inline_keyboard: [
-//             [{text: 1, callback_data: '1'}, {text: 2, callback_data: '2'}]
-//         ]
-//     })
-// };
-
-// bot.on('message', async msg => {
-
-//     const text = msg.text;
-//     const chat_id = msg.chat.id;
-
-//     // sendMessage ( chatID, message, form )
-
-//     if (text === '/info') return await bot.sendMessage(chat_id, 'some info');
-
-//     if (text === '/test') return await button_test(chat_id);
-
-// });
-
-// // buttons callback
-// bot.on('callback_query', async msg => {
-
-//     const data = msg.data;
-//     const chat_id = msg.message.chat.id;
-
-//     bot.sendMessage(chat_id, data);
-
-//     console.log(msg);
-
-// });
-
-// async function button_test(chat_id) {
-
-//     bot.sendMessage(chat_id, 'buttons', buttons);
-
-// }
-
+bot.launch();
